@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Proctoring Analysis</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Video Proctoring Analysis</h1>
+    <p>Upload your video for proctoring analysis.</p>
+
+    <!-- Video Upload Section -->
+    <form id="uploadForm">
+      <input type="file" id="videoFile" accept="video/*" required>
+      <button type="submit">Upload and Analyze</button>
+    </form>
+
+    <!-- Analysis Results Section -->
+    <div id="results" class="hidden">
+      <h2>Analysis Results</h2>
+      <p><strong>Status:</strong> <span id="status"></span></p>
+      <p><strong>Details:</strong> <span id="details"></span></p>
+    </div>
+
+    <!-- Video Preview Section -->
+    <div id="videoPreview" class="hidden">
+      <h2>Video Preview</h2>
+      <video id="uploadedVideo" controls></video>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
