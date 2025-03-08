@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Proctoring System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .options {
+            display: flex;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+        .option {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 45%;
+        }
+        .option:hover {
+            background-color: #f0f0f0;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .video-container {
+            margin-top: 20px;
+            display: none;
+        }
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background-color: #000;
+        }
+        .upload-container {
+            margin-top: 20px;
+            display: none;
+        }
+        .button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .notification-area {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            min-height: 100px;
+        }
+        .notification {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .danger {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .hidden {
+            display: none;
+        }
+        progress {
+            width: 100%;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Proctoring System</h1>
+        <p>Please select one of the following options to begin the proctoring session:</p>
+        
+        <div class="options">
+            <div class="option" id="webcam-option">
+                <h2>Use Webcam</h2>
+                <p>Start a live proctoring session using your webcam</p>
+            </div>
+            <div class="option" id="upload-option">
+                <h2>Upload Video</h2>
+                <p>Upload a pre-recorded video for proctoring analysis</p>
+            </div>
+        </div>
+        
+        <div class="video-container" id="webcam-container">
+            <h2>Webcam Feed</h2>
+            <video id="webcam" autoplay playsinline></video>
+            <div class="button-group">
+                <button class="button" id="start-webcam">Start Proctoring</button>
+                <button class="button" id="stop-webcam" style="background-color: #e74c3c;">Stop</button>
+            </div>
+        </div>
+        
+        <div class="upload-container" id="upload-container">
+            <h2>Upload Video</h2>
+            <input type="file" id="video-upload" accept="video/*" />
+            <button class="button" id="upload-button">Upload and Analyze</button>
+            <div id="upload-progress" class="hidden">
+                <p>Uploading and analyzing video...</p>
+                <progress id="progress-bar" value="0" max="100"></progress>
+            </div>
+        </div>
+        
+        <div class="notification-area" id="notification-area">
+            <h2>Proctoring Notifications</h2>
+            <div id="notifications">
+                <p>Notifications will appear here during the proctoring session.</p>
+            </div>
+            <div id="violation-counter" class="hidden">
+                <p>Violations detected: <span id="violation-count">0</span>/6</p>
+            </div>
+        </div>
+    </div>
+    <script>
+        // DOM Elements
+        const webcamOption = document.getElementById('webcam-option');
+        const uploadOption = document.getElementById('upload-option');
+        const webcamContainer = document.getElementById('webcam-container');
+        const uploadContainer = document.getElementById('upload-container');
+        const webcamVideo = document.getElementById('webcam');
+        const startWebcamBtn = document.getElementById('start-webcam');
+        const stopWebcamBtn = document.getElementById('stop-webcam');
+        const uploadBtn = document.getElementById('upload-button');
+        const videoUpload = document.getElementById('video-upload');
+        const uploadProgress = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const notificationArea = document.getElementById('notifications');
+        const violationCounter = document.getElementById('violation-counter');
+        const violationCount = document.getElementById('violation-count');
+        
+        let stream = null;
+        let violations = 0;
+        let proctorInterval = null;
+        
+        // Show webcam option
+        webcamOption.addEventListener('click', () => {
+            webcamContainer.style.display = 'block';
+            uploadContainer.style.display = 'none';
+        });
+        
+        // Show upload option
+        uploadOption.addEventListener('click', () => {
+            uploadContainer.style.display = 'block';
+            webcamContainer.style.display = 'none';
+        });
+        
+        // Start webcam
+        startWebcamBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                webcamVideo.srcObject = stream;
+                
+                // Start proctoring session
+                startProctoring();
+                
+                // Show violation counter
+                violationCounter.classList.remove('hidden');
+                
+                // Add initial notification
+                addNotification('Proctoring session started. Your video and audio are being monitored.', 'normal');
+            } catch (err) {
+                console.error('Error accessing webcam:', err);
+                addNotification('Error accessing webcam. Please ensure you have given permission to use the camera and microphone.', 'danger');
+            }
+        });
+        
+        // Stop webcam
+        stopWebcamBtn.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                webcamVideo.srcObject = null;
+                
+                // Stop proctoring session
+                clearInterval(proctorInterval);
+                
+                // Reset violation counter
+                violations = 0;
+                violationCount.textContent = violations;
+                
+                // Add notification
+                addNotification('Proctoring session ended.', 'normal');
+            }
+        });
+        
+        // Upload and analyze video
+        uploadBtn.addEventListener('click', () => {
+            const file = videoUpload.files[0];
+            if (!file) {
+                addNotification('Please select a video file to upload.', 'warning');
+                return;
+            }
+            
+            // Show progress
+            uploadProgress.classList.remove('hidden');
+            
+            // Simulate uploading and processing
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBar.value = progress;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    
+                    // Simulate analysis results
+                    setTimeout(() => {
+                        uploadProgress.classList.add('hidden');
+                        simulateVideoAnalysis();
+                    }, 1000);
+                }
+            }, 300);
+        });
+        
+        // Function to start proctoring
+        function startProctoring() {
+            // Reset violations
+            violations = 0;
+            violationCount.textContent = violations;
+            
+            // Simulate proctoring by checking at random intervals
+            proctorInterval = setInterval(() => {
+                // In a real implementation, you would be sending frames to the backend
+                // Here we'll randomly simulate detections
+                if (Math.random() < 0.2) {
+                    // 20% chance of detecting a violation
+                    detectViolation();
+                }
+            }, 5000); // Check every 5 seconds
+        }
+        
+        // Function to simulate video analysis after upload
+        function simulateVideoAnalysis() {
+            // Show violation counter
+            violationCounter.classList.remove('hidden');
+            
+            // Reset violations
+            violations = 0;
+            violationCount.textContent = violations;
+            
+            // Simulate finding issues in the video
+            const issueTypes = [
+                'Looking away from screen',
+                'Another person detected',
+                'Phone usage detected',
+                'Background voices detected',
+                'Suspicious eye movements'
+            ];
+            
+            // Generate random number of violations (0-8)
+            const numViolations = Math.floor(Math.random() * 9);
+            
+            // Add notification about analysis
+            addNotification(`Video analysis complete. ${numViolations} potential violations detected.`, 'normal');
+            
+            // Add individual violations
+            for (let i = 0; i < numViolations; i++) {
+                const issueType = issueTypes[Math.floor(Math.random() * issueTypes.length)];
+                const timestamp = Math.floor(Math.random() * 10) + 1;
+                
+                setTimeout(() => {
+                    detectViolation(issueType, timestamp);
+                }, i * 1000);
+            }
+        }
+        
+        // Function to simulate detecting a violation
+        function detectViolation(issue = null, timestamp = null) {
+            violations++;
+            violationCount.textContent = violations;
+            
+            // Choose a random violation type if not provided
+            if (!issue) {
+                const issues = [
+                    'Looking away from screen',
+                    'Multiple faces detected',
+                    'Suspicious object detected',
+                    'Background noise detected',
+                    'Abnormal eye movements'
+                ];
+                issue = issues[Math.floor(Math.random() * issues.length)];
+            }
+            
+            // Create notification message
+            let message = `Warning: ${issue} detected`;
+            if (timestamp) {
+                message += ` at ${timestamp} minutes in the video`;
+            }
+            
+            // Add the notification
+            addNotification(message, 'warning');
+            
+            // Check if max violations reached
+            if (violations >= 6) {
+                addNotification('You have exceeded the maximum number of allowed violations. You are not eligible to continue the exam.', 'danger');
+                
+                // If using webcam, stop it
+                if (stream) {
+                    stopWebcamBtn.click();
+                }
+            }
+        }
+        
+        // Function to add a notification
+        function addNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            // Add timestamp
+            const timestamp = new Date().toLocaleTimeString();
+            const timeElement = document.createElement('small');
+            timeElement.textContent = ` (${timestamp})`;
+            timeElement.style.marginLeft = '10px';
+            timeElement.style.color = '#666';
+            notification.appendChild(timeElement);
+            
+            // Add to notification area
+            notificationArea.insertBefore(notification, notificationArea.firstChild);
+        }
+        
+        // Function to send data to the backend
+        async function sendToBackend(data) {
+            try {
+                const response = await fetch('/api/proctoring/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error sending data to backend:', error);
+                return null;
+            }
+        }
+        // Constants for API endpoints
+        const API_ENDPOINTS = {
+            ANALYZE_VIDEO: '/api/proctoring/analyze',
+            ANALYZE_FRAME: '/api/proctoring/analyze-frame',
+            SESSIONS: '/api/sessions'
+        };
+
+        // Example function to send frame data to backend
+        async function sendFrameToBackend(frameData) {
+            try {
+                const response = await fetch(API_ENDPOINTS.ANALYZE_FRAME, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // Include CSRF token if using Django's CSRF protection
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify(frameData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error sending frame to backend:', error);
+                return null;
+            }
+        }
+
+        // Helper function to get CSRF token from cookies (if using Django's CSRF protection)
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+
+</body>
+</html>
